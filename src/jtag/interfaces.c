@@ -117,6 +117,9 @@ extern struct jtag_interface opendous_interface;
 #if BUILD_SYSFSGPIO == 1
 extern struct jtag_interface sysfsgpio_interface;
 #endif
+#if BUILD_FREEBDGPIO == 1
+extern struct jtag_interface freebsdgpio_interface;
+#endif
 #if BUILD_AICE == 1
 extern struct jtag_interface aice_interface;
 #endif

@@ -323,6 +323,18 @@ AS_CASE([$host_os],
     ])
 ])
 
+AC_ARG_ENABLE([freebsdgpio],
+  AS_HELP_STRING([--enable-freebsdgpio], [Enable building support for programming driven via FreeBSD gpios.]),
+  [build_freebsdgpio=$enableval], [build_freebsdgpio=no])
+
+AS_CASE([$host_os],
+  [freebsd*], [],
+  [
+    AS_IF([test "x$build_freebsdgpio" = "xyes"], [
+      AC_MSG_ERROR([freebsdgpio is only available on FreeBSD])
+    ])
+])
+
 AC_ARG_ENABLE([minidriver_dummy],
   AS_HELP_STRING([--enable-minidriver-dummy], [Enable the dummy minidriver.]),
   [build_minidriver_dummy=$enableval], [build_minidriver_dummy=no])
@@ -580,6 +592,13 @@ AS_IF([test "x$build_sysfsgpio" = "xyes"], [
   AC_DEFINE([BUILD_SYSFSGPIO], [0], [0 if you don't want SysfsGPIO driver.])
 ])
 
+AS_IF([test "x$build_freebsdgpio" = "xyes"], [
+  build_bitbang=yes
+  AC_DEFINE([BUILD_FREEBSDGPIO], [1], [1 if you want the FreeBSD gpio driver.])
+], [
+  AC_DEFINE([BUILD_FREEBSDGPIO], [0], [0 if you don't want FreeBSD gpio driver.])
+])
+
 AS_IF([test "x$build_target64" = "xyes"], [
   AC_DEFINE([BUILD_TARGET64], [1], [1 if you want 64-bit addresses.])
 ], [
@@ -699,6 +718,7 @@ AM_CONDITIONAL([OOCD_TRACE], [test "x$build_oocd_trace" = "xyes"])
 AM_CONDITIONAL([REMOTE_BITBANG], [test "x$build_remote_bitbang" = "xyes"])
 AM_CONDITIONAL([BUSPIRATE], [test "x$build_buspirate" = "xyes"])
 AM_CONDITIONAL([SYSFSGPIO], [test "x$build_sysfsgpio" = "xyes"])
+AM_CONDITIONAL([FREEBSDGPIO], [test "x$build_freebsdgpio" = "xyes"])
 AM_CONDITIONAL([USE_LIBUSB0], [test "x$use_libusb0" = "xyes"])
 AM_CONDITIONAL([USE_LIBUSB1], [test "x$use_libusb1" = "xyes"])
 AM_CONDITIONAL([IS_CYGWIN], [test "x$is_cygwin" = "xyes"])
