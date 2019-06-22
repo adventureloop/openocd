@@ -77,47 +77,14 @@ static int is_gpio_valid(int gpio)
 }
 
 /*
- * Helper func to open, write to and close a file
- * name and valstr must be null terminated.
- *
- * Returns negative on failure.
- */
-static int open_write_close(const char *name, const char *valstr)
-{
-	int ret;
-	int fd = open(name, O_WRONLY);
-	if (fd < 0)
-		return fd;
-
-	ret = write(fd, valstr, strlen(valstr));
-	close(fd);
-
-	return ret;
-}
-
-/*
- * Helper func to unexport gpio from sysfs
- */
-static void unexport_sysfs_gpio(int gpio)
-{
-	// nop
-}
-
-/*
  * Configure gpio
  * If the gpio is an output, it is initialized according to init_high,
  * otherwise it is ignored.
  *
  */
-static int setup_gpio(gpio_hand_t handle, int gpio, int is_output, int init_high)
+static int setup_gpio(gpio_handle_t handle, int gpio, int is_output, int init_high)
 {
 	int ret = -1;
-	//struct gpio_pin_config_t config;
-
-	// TODO: configure the pin as an input or an output, set if high if an
-	// output and required.
-	//config.g_pin = gpio;	
-	//gpio_pin_config(handle, &config); 
 
 	if (is_output) {
 		gpio_pin_output(handle, gpio);
@@ -158,10 +125,10 @@ static bool swdio_input;
 static void freebsdgpio_swdio_drive(bool is_output)
 {
 	if (is_output) {
-		gpio_pin_input(swdio_handle, swdio);
-		gpio_pin_high(swdio_handle, swdio);
+		gpio_pin_input(swdio_handle, swdio_gpio);
+		gpio_pin_high(swdio_handle, swdio_gpio);
 	} else
-		gpio_pin_input(swdio_handle, swdio);
+		gpio_pin_input(swdio_handle, swdio_gpio);
 
 
 	last_stored = false;
@@ -173,7 +140,7 @@ static int freebsdgpio_swdio_read(void)
 	// the sysfs logic is really silly
 	//return buf[0] != '0';
 
-	return gpio_pin_get(swdio_handle, swdio) != GPIO_LOW;
+	return gpio_pin_get(swdio_handle, swdio_gpio) != GPIO_PIN_LOW;
 }
 
 static void freebsdgpio_swdio_write(int swclk, int swdio)
@@ -208,7 +175,7 @@ static bb_value_t freebsdgpio_read(void)
 {
 	gpio_value_t value;
 
-	value = gpio_pin_get(tdo_handle, tdo);
+	value = gpio_pin_get(tdo_handle, tdo_gpio);
 	return (value == GPIO_PIN_HIGH) ? BB_HIGH : BB_LOW;
 }
 
@@ -230,7 +197,6 @@ static int freebsdgpio_write(int tck, int tms, int tdi)
 	static int last_tdi;
 
 	static int first_time;
-	size_t bytes_written;
 
 	if (!first_time) {
 		last_tck = !tck;
@@ -241,24 +207,24 @@ static int freebsdgpio_write(int tck, int tms, int tdi)
 
 	if (tdi != last_tdi) {
 		if (tdi)
-			gpio_pin_high(handle, tdi);
+			gpio_pin_high(tdi_handle, tdi);
 		else
-			gpio_pin_low(handle, tdi);
+			gpio_pin_low(tdi_handle, tdi);
 	}
 
 	if (tms != last_tms) {
 		if (tms)
-			gpio_pin_high(handle, tms);
+			gpio_pin_high(tms_handle, tms);
 		else
-			gpio_pin_low(handle, tms);
+			gpio_pin_low(tms_handle, tms);
 	}
 
 	/* write clk last */
 	if (tck != last_tck) {
 		if (tck)
-			gpio_pin_high(handle, tck);
+			gpio_pin_high(tck_handle, tck);
 		else
-			gpio_pin_low(handle, tck);
+			gpio_pin_low(tck_handle, tck);
 	}
 
 	last_tdi = tdi;
@@ -501,17 +467,6 @@ static struct bitbang_interface freebsdgpio_bitbang = {
 	.blink = 0
 };
 
-/* helper func to close and cleanup files only if they were valid/ used */
-static void cleanup_fd(int fd, int gpio)
-{
-	// nop
-}
-
-static void cleanup_all_fds(void)
-{
-	// nop
-}
-
 static bool freebsdgpio_jtag_mode_possible(void)
 {
 	if (!is_gpio_valid(tck_gpio))
@@ -537,7 +492,7 @@ static bool freebsdgpio_swd_mode_possible(void)
 static int freebsdgpio_init(void)
 {
 // TODO: all the set up we must do to replace this
-	bitbang_interface = &sysfsgpio_bitbang;		// TODO: I don't know!
+	bitbang_interface = &freebsdgpio_bitbang;
 
 	LOG_INFO("FreeBSD GPIO JTAG/SWD bitbang driver");
 
@@ -573,52 +528,52 @@ static int freebsdgpio_init(void)
 	 * For SWD, SWCLK and SWDIO are configures as output high.
 	 */
 	if (tck_gpio >= 0) {
-		tck_fd = setup_gpio(tck_gpio, 1, 0);
-		if (tck_fd < 0)
+		tck_handle = setup_gpio(tck_handle, tck_gpio, 1, 0);
+		if (tck_handle < 0)
 			goto out_error;
 	}
 
 	if (tms_gpio >= 0) {
-		tms_fd = setup_gpio(tms_gpio, 1, 1);
-		if (tms_fd < 0)
+		tms_handle = setup_gpio(tms_handle, tms_gpio, 1, 1);
+		if (tms_handle < 0)
 			goto out_error;
 	}
 
 	if (tdi_gpio >= 0) {
-		tdi_fd = setup_gpio(tdi_gpio, 1, 0);
-		if (tdi_fd < 0)
+		tdi_handle = setup_gpio(tdi_handle, tdi_gpio, 1, 0);
+		if (tdi_handle < 0)
 			goto out_error;
 	}
 
 	if (tdo_gpio >= 0) {
-		tdo_fd = setup_gpio(tdo_gpio, 0, 0);
-		if (tdo_fd < 0)
+		tdo_handle = setup_gpio(tdo_handle, tdo_gpio, 0, 0);
+		if (tdo_handle < 0)
 			goto out_error;
 	}
 
 	/* assume active low*/
 	if (trst_gpio >= 0) {
-		trst_fd = setup_gpio(trst_gpio, 1, 1);
-		if (trst_fd < 0)
+		trst_handle = setup_gpio(trst_handle, trst_gpio, 1, 1);
+		if (trst_handle < 0)
 			goto out_error;
 	}
 
 	/* assume active low*/
 	if (srst_gpio >= 0) {
-		srst_fd = setup_gpio(srst_gpio, 1, 1);
-		if (srst_fd < 0)
+		srst_handle = setup_gpio(srst_handle, srst_gpio, 1, 1);
+		if (srst_handle < 0)
 			goto out_error;
 	}
 
 	if (swclk_gpio >= 0) {
-		swclk_fd = setup_gpio(swclk_gpio, 1, 0);
-		if (swclk_fd < 0)
+		swclk_handle = setup_gpio(swclk_handle, swclk_gpio, 1, 0);
+		if (swclk_handle < 0)
 			goto out_error;
 	}
 
 	if (swdio_gpio >= 0) {
-		swdio_fd = setup_gpio(swdio_gpio, 1, 0);
-		if (swdio_fd < 0)
+		swdio_handle = setup_gpio(swdio_handle, swdio_gpio, 1, 0);
+		if (swdio_handle < 0)
 			goto out_error;
 	}
 
