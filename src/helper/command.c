@@ -333,7 +333,6 @@ static struct command *command_new(struct command_context *cmd_ctx,
 	c->parent = parent;
 	c->handler = cr->handler;
 	c->jim_handler = cr->jim_handler;
-	c->jim_handler_data = cr->jim_handler_data;
 	c->mode = cr->mode;
 
 	command_add_child(command_list_for_parent(cmd_ctx, parent), c);
@@ -385,7 +384,7 @@ struct command *register_command(struct command_context *context,
 	int retval = ERROR_OK;
 	if (NULL != cr->jim_handler && NULL == parent) {
 		retval = Jim_CreateCommand(context->interp, cr->name,
-				cr->jim_handler, cr->jim_handler_data, NULL);
+				cr->jim_handler, NULL, NULL);
 	} else if (NULL != cr->handler || NULL != parent)
 		retval = register_command_handler(context, command_root(c));
 
@@ -652,9 +651,11 @@ int command_run_line(struct command_context *context, char *line)
 	 * happen when the Jim Tcl interpreter is provided by eCos for
 	 * instance.
 	 */
+	struct target *saved_target_override = context->current_target_override;
 	context->current_target_override = NULL;
 
 	Jim_Interp *interp = context->interp;
+	struct command_context *old_context = Jim_GetAssocData(interp, "context");
 	Jim_DeleteAssocData(interp, "context");
 	retcode = Jim_SetAssocData(interp, "context", NULL, context);
 	if (retcode == JIM_OK) {
@@ -667,7 +668,11 @@ int command_run_line(struct command_context *context, char *line)
 			Jim_DeleteAssocData(interp, "retval");
 		}
 		Jim_DeleteAssocData(interp, "context");
+		int inner_retcode = Jim_SetAssocData(interp, "context", NULL, old_context);
+		if (retcode == JIM_OK)
+			retcode = inner_retcode;
 	}
+	context->current_target_override = saved_target_override;
 	if (retcode == JIM_OK) {
 		const char *result;
 		int reslen;
@@ -1388,6 +1393,7 @@ void process_jim_events(struct command_context *cmd_ctx)
 			return ERROR_COMMAND_ARGUMENT_INVALID; \
 		} \
 		char *end; \
+		errno = 0; \
 		*ul = func(str, &end, 0); \
 		if (*end) { \
 			LOG_ERROR("Invalid command argument"); \

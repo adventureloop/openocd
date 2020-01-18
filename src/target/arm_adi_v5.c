@@ -804,26 +804,9 @@ int mem_ap_init(struct adiv5_ap *ap)
  */
 int dap_to_swd(struct adiv5_dap *dap)
 {
-	int retval;
-
 	LOG_DEBUG("Enter SWD mode");
 
-	if (transport_is_jtag()) {
-		retval =  jtag_add_tms_seq(swd_seq_jtag_to_swd_len,
-				swd_seq_jtag_to_swd, TAP_INVALID);
-		if (retval == ERROR_OK)
-			retval = jtag_execute_queue();
-		return retval;
-	}
-
-	if (transport_is_swd()) {
-		const struct swd_driver *swd = adiv5_dap_swd_driver(dap);
-
-		return swd->switch_seq(JTAG_TO_SWD);
-	}
-
-	LOG_ERROR("Nor JTAG nor SWD transport");
-	return ERROR_FAIL;
+	return dap_send_sequence(dap, JTAG_TO_SWD);
 }
 
 /**
@@ -839,26 +822,9 @@ int dap_to_swd(struct adiv5_dap *dap)
  */
 int dap_to_jtag(struct adiv5_dap *dap)
 {
-	int retval;
-
 	LOG_DEBUG("Enter JTAG mode");
 
-	if (transport_is_jtag()) {
-		retval = jtag_add_tms_seq(swd_seq_swd_to_jtag_len,
-				swd_seq_swd_to_jtag, TAP_RESET);
-		if (retval == ERROR_OK)
-			retval = jtag_execute_queue();
-		return retval;
-	}
-
-	if (transport_is_swd()) {
-		const struct swd_driver *swd = adiv5_dap_swd_driver(dap);
-
-		return swd->switch_seq(SWD_TO_JTAG);
-	}
-
-	LOG_ERROR("Nor JTAG nor SWD transport");
-	return ERROR_FAIL;
+	return dap_send_sequence(dap, SWD_TO_JTAG);
 }
 
 /* CID interpretation -- see ARM IHI 0029B section 3
@@ -914,7 +880,8 @@ int dap_find_ap(struct adiv5_dap *dap, enum ap_type type_to_find, struct adiv5_a
 			((id_val & IDR_TYPE) == type_to_find)) {      /* type matches*/
 
 			LOG_DEBUG("Found %s at AP index: %d (IDR=0x%08" PRIX32 ")",
-						(type_to_find == AP_TYPE_AHB_AP)  ? "AHB-AP"  :
+						(type_to_find == AP_TYPE_AHB3_AP)  ? "AHB3-AP"  :
+						(type_to_find == AP_TYPE_AHB5_AP)  ? "AHB5-AP"  :
 						(type_to_find == AP_TYPE_APB_AP)  ? "APB-AP"  :
 						(type_to_find == AP_TYPE_AXI_AP)  ? "AXI-AP"  :
 						(type_to_find == AP_TYPE_JTAG_AP) ? "JTAG-AP" : "Unknown",
@@ -926,7 +893,8 @@ int dap_find_ap(struct adiv5_dap *dap, enum ap_type type_to_find, struct adiv5_a
 	}
 
 	LOG_DEBUG("No %s found",
-				(type_to_find == AP_TYPE_AHB_AP)  ? "AHB-AP"  :
+				(type_to_find == AP_TYPE_AHB3_AP)  ? "AHB3-AP"  :
+				(type_to_find == AP_TYPE_AHB5_AP)  ? "AHB5-AP"  :
 				(type_to_find == AP_TYPE_APB_AP)  ? "APB-AP"  :
 				(type_to_find == AP_TYPE_AXI_AP)  ? "AXI-AP"  :
 				(type_to_find == AP_TYPE_JTAG_AP) ? "JTAG-AP" : "Unknown");
@@ -1466,8 +1434,11 @@ int dap_info_command(struct command_invocation *cmd,
 	case IDR_JEP106_ARM | AP_TYPE_JTAG_AP:
 		command_print(cmd, "\tType is JTAG-AP");
 		break;
-	case IDR_JEP106_ARM | AP_TYPE_AHB_AP:
-		command_print(cmd, "\tType is MEM-AP AHB");
+	case IDR_JEP106_ARM | AP_TYPE_AHB3_AP:
+		command_print(cmd, "\tType is MEM-AP AHB3");
+		break;
+	case IDR_JEP106_ARM | AP_TYPE_AHB5_AP:
+		command_print(cmd, "\tType is MEM-AP AHB5");
 		break;
 	case IDR_JEP106_ARM | AP_TYPE_APB_AP:
 		command_print(cmd, "\tType is MEM-AP APB");
