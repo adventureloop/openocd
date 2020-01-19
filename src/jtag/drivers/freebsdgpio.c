@@ -95,6 +95,9 @@ static int setup_gpio(gpio_handle_t handle, int gpio, int is_output, int init_hi
 	return ret;
 }
 
+/* default to bus 0 */
+static int gpiobus = 0;
+
 /* gpio numbers for each gpio. Negative values are invalid */
 static int tck_gpio = -1;
 static int tms_gpio = -1;
@@ -262,6 +265,15 @@ static int freebsdgpio_reset(int trst, int srst)
 	return ERROR_OK;
 }
 
+COMMAND_HANDLER( freebsdgpio_handle_bus)
+{
+	if (CMD_ARGC == 1)
+		COMMAND_PARSE_NUMBER(int, CMD_ARGV[0], gpiobus);
+
+	command_print(CMD, "gpiobus num: bus = %d", tck_gpio);
+	return ERROR_OK;
+}
+
 COMMAND_HANDLER(freebsdgpio_handle_jtag_gpionums)
 {
 	if (CMD_ARGC == 4) {
@@ -370,6 +382,13 @@ COMMAND_HANDLER(freebsdgpio_handle_swd_gpionum_swdio)
 
 static const struct command_registration freebsdgpio_command_handlers[] = {
 	{
+		.name = "freebsdgpio_bus",
+		.handler = &freebsdgpio_handle_bus,
+		.mode = COMMAND_CONFIG,
+		.help = "gpio bus number",
+		.usage = "[bus]",
+	},
+	{
 		.name = "freebsdgpio_jtag_nums",
 		.handler = &freebsdgpio_handle_jtag_gpionums,
 		.mode = COMMAND_CONFIG,
@@ -448,23 +467,33 @@ static int freebsdgpio_quit(void);
 static const char * const freebsdgpio_transports[] = { "jtag", "swd", NULL };
 
 struct jtag_interface freebsdgpio_interface = {
-	.name = "freebsdgpio",
 	.supported = DEBUG_CAP_TMS_SEQ,
-	.execute_queue = bitbang_execute_queue,	// TODO: no idea
-	.transports = freebsdgpio_transports,
-	.swd = &bitbang_swd,			// TODO: no idea
-	.commands = freebsdgpio_command_handlers,
-	.init = freebsdgpio_init,
-	.quit = freebsdgpio_quit,
+	.execute_queue = bitbang_execute_queue,
 };
 
 static struct bitbang_interface freebsdgpio_bitbang = {
 	.read = freebsdgpio_read,
 	.write = freebsdgpio_write,
-	.reset = freebsdgpio_reset,
+	//.reset = freebsdgpio_reset,
 	.swdio_read = freebsdgpio_swdio_read,
 	.swdio_drive = freebsdgpio_swdio_drive,
-	.blink = 0
+	.blink = NULL
+};
+
+struct adapter_driver freebsdgpio_adapter_driver = {
+        .name = "freebsdgpio",
+        .transports = freebsdgpio_transports,
+        .commands = freebsdgpio_command_handlers,
+
+        .init = freebsdgpio_init,
+        .quit = freebsdgpio_quit,
+        .reset = freebsdgpio_reset,
+//        .speed = freebsdgpio_speed,	TODO
+//        .khz = freebsdgpio_khz,
+//        .speed_div = freebsdgpio_speed_div,
+
+        .jtag_ops = &freebsdgpio_interface,
+        .swd_ops = &bitbang_swd,
 };
 
 static bool freebsdgpio_jtag_mode_possible(void)
