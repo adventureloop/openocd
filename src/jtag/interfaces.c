@@ -120,14 +120,14 @@ extern struct adapter_driver sysfsgpio_adapter_driver;
 #if BUILD_XLNX_PCIE_XVC == 1
 extern struct jtag_interface xlnx_pcie_xvc_interface;
 #endif
-#if BUILD_FREEBDGPIO == 1
-extern struct jtag_interface freebsdgpio_interface;
-#endif
 #if BUILD_AICE == 1
 extern struct adapter_driver aice_adapter_driver;
 #endif
 #if BUILD_BCM2835GPIO == 1
 extern struct adapter_driver bcm2835gpio_adapter_driver;
+#endif
+#if BUILD_FREEBSDGPIO == 1
+extern struct adapter_driver freebsdgpio_adapter_driver;
 #endif
 #if BUILD_CMSIS_DAP == 1
 extern struct adapter_driver cmsis_dap_adapter_driver;
@@ -239,6 +239,9 @@ struct adapter_driver *adapter_drivers[] = {
 #endif
 #if BUILD_BCM2835GPIO == 1
 		&bcm2835gpio_adapter_driver,
+#endif
+#if BUILD_FREEBSDGPIO == 1
+		&freebsdgpio_adapter_driver,
 #endif
 #if BUILD_CMSIS_DAP == 1
 		&cmsis_dap_adapter_driver,
