@@ -87,11 +87,11 @@ static int setup_gpio(gpio_handle_t handle, int gpio, int is_output, int init_hi
 	int ret = -1;
 
 	if (is_output) {
-		gpio_pin_output(handle, gpio);
+		ret = gpio_pin_output(handle, gpio);
 		if (init_high)
-			gpio_pin_high(handle, gpio);
+			ret = gpio_pin_high(handle, gpio);
 	} else
-		gpio_pin_input(handle, gpio);
+		ret = gpio_pin_input(handle, gpio);
 	return ret;
 }
 
@@ -520,6 +520,7 @@ static bool freebsdgpio_swd_mode_possible(void)
 
 static int freebsdgpio_init(void)
 {
+	int error = 0;
 // TODO: all the set up we must do to replace this
 	bitbang_interface = &freebsdgpio_bitbang;
 
@@ -540,9 +541,9 @@ static int freebsdgpio_init(void)
 	}
 
 	LOG_INFO("Defaulting to opening gpioc0");
-	gpio_handle_t gpioc = gpio_open(0);
-
-	tck_handle = gpioc;
+	//TODO Handle open error
+	//TODO Handle multiple buses
+	
 	tms_handle = gpioc;
 	tdi_handle = gpioc;
 	tdo_handle = gpioc;
@@ -557,53 +558,69 @@ static int freebsdgpio_init(void)
 	 * For SWD, SWCLK and SWDIO are configures as output high.
 	 */
 	if (tck_gpio >= 0) {
-		tck_handle = setup_gpio(tck_handle, tck_gpio, 1, 0);
-		if (tck_handle < 0)
+		error = setup_gpio(tck_handle, tck_gpio, 1, 0);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	if (tms_gpio >= 0) {
-		tms_handle = setup_gpio(tms_handle, tms_gpio, 1, 1);
-		if (tms_handle < 0)
+		error = setup_gpio(tms_handle, tms_gpio, 1, 1);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	if (tdi_gpio >= 0) {
-		tdi_handle = setup_gpio(tdi_handle, tdi_gpio, 1, 0);
-		if (tdi_handle < 0)
+		error = setup_gpio(tdi_handle, tdi_gpio, 1, 0);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	if (tdo_gpio >= 0) {
-		tdo_handle = setup_gpio(tdo_handle, tdo_gpio, 0, 0);
-		if (tdo_handle < 0)
+		error = setup_gpio(tdo_handle, tdo_gpio, 0, 0);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	/* assume active low*/
 	if (trst_gpio >= 0) {
-		trst_handle = setup_gpio(trst_handle, trst_gpio, 1, 1);
-		if (trst_handle < 0)
+		error = setup_gpio(trst_handle, trst_gpio, 1, 1);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	/* assume active low*/
 	if (srst_gpio >= 0) {
-		srst_handle = setup_gpio(srst_handle, srst_gpio, 1, 1);
-		if (srst_handle < 0)
+		error = setup_gpio(srst_handle, srst_gpio, 1, 1);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	if (swclk_gpio >= 0) {
-		swclk_handle = setup_gpio(swclk_handle, swclk_gpio, 1, 0);
-		if (swclk_handle < 0)
+		error = setup_gpio(swclk_handle, swclk_gpio, 1, 0);
+		if (error < 0){
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		 }
 	}
 
 	if (swdio_gpio >= 0) {
-		swdio_handle = setup_gpio(swdio_handle, swdio_gpio, 1, 0);
-		if (swdio_handle < 0)
+		error = setup_gpio(swdio_handle, swdio_gpio, 1, 0);
+		if (error < 0) {
+			LOG_INFO("erroring out from %s:%d", __func__,__LINE__);
 			goto out_error;
+		}
 	}
 
 	if (freebsdgpio_swd_mode_possible()) {
