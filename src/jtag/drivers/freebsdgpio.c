@@ -542,8 +542,10 @@ static int freebsdgpio_init(void)
 
 	LOG_INFO("Defaulting to opening gpioc0");
 	//TODO Handle open error
-	//TODO Handle multiple buses
-	
+	//TODO Handle open error
+	gpio_handle_t gpioc = gpio_open(0);
+
+	tck_handle = gpioc;
 	tms_handle = gpioc;
 	tdi_handle = gpioc;
 	tdo_handle = gpioc;
